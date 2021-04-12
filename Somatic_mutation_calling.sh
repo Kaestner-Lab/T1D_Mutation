@@ -32,25 +32,29 @@ samtools mpileup -f hg19.genome -B pancreas.bam spleen.bam > output.pileup
 # run mutect to call somatic mutations
 java -Xmx200g -jar mutect --analysis_type MuTect --reference_sequence hg19.genome --input_file:tumor pancreas.bam --input_file:normal spleen.bam --vcf output.vcf -l ERROR
 
-# run strelka
+# run strelka to call somatic mutations
 strelka --normalBam spleen.bam --tumorBam pancreas.bam --referenceFasta hg19.genome --runDir output_dir
 output_dir/runWorkflow.py -m local
 gzip -d output_dir/results/variants/*
 mv output_dir/results/variants/somatic.indels.vcf output_dir/passed.somatic.indels.vcf
 mv output_dir/results/variants/somatic.snvs.vcf output_dir/passed.somatic.snvs.vcf
 
-# run speedseq
+# run speedseq to call somatic mutations
 speedseq somatic -q 1 -t 10 -T speed_tmp_dir -o output_dir hg19.genome spleen.bam pancreas.bam
 gzip -d output_dir/sample.vcf.gz
 
-# run varscan
+# run varscan to call somatic mutations
 java -jar varscan somatic sample.pileup output_dir --mpileup 1 --min-coverage 8 --min-coverage-normal 8 --min-coverage-tumor 6 --min-var-freq 0.10 --min-freq-for-hom 0.75 --normal-purity 1.0 --tumor-purity 1.0 --p-value 0.05 --somatic-p-value 0.05 --strand-filter 0 --output-vcf
 java -jar varscan processSomatic sample.indel.vcf
 java -jar varscan processSomatic sample.snps.vcf
 
-# run muse
+# run muse to call somatic mutations
 muse call -O output_dir -f hg19.genome pancreas.bam spleen.bam
-muse sump -I sample.MuSE.txt -E -O output.vcf -D dbsnp.gzip
+muse sump -I sample.MuSE.txt -E -O output.vcf -D dbsnp.gz
 
+# run vardict to call somatic mutations
+vardict -G hg19.genome -N T1D -b "pancreas.bam|spleen.bam" -c 1 -S 2 -E 3 -g 4 vardict.bed | /VarDict/testsomatic.R | VarDict/var2vcf_paired.pl -N "tumor_sample_name|normal_sample_name"
 
+# estimate read counts at particular places such as mutations
+bamRead -f hg19.genome -l mutations.bed sample.bam > output.txt
 
